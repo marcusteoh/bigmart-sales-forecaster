@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
+.venv/
+
+# Provided TP template - reference only, not part of the submission
+MLDP Program Codes Submission Template*.ipynb
