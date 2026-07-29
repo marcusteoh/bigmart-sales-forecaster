@@ -1,0 +1,116 @@
+{
+  "model_name": "Gradient Boosting (tuned)",
+  "model_params": {
+    "subsample": 0.9,
+    "n_estimators": 100,
+    "min_samples_leaf": 10,
+    "max_depth": 3,
+    "learning_rate": 0.05
+  },
+  "sklearn_version": "1.8.0",
+  "data_year": 2013,
+  "random_state": 42,
+  "numeric_features": [
+    "Item_Weight",
+    "Item_Visibility",
+    "Item_MRP",
+    "Outlet_Age"
+  ],
+  "categorical_features": [
+    "Item_Fat_Content",
+    "Item_Type",
+    "Outlet_Size",
+    "Outlet_Location_Type",
+    "Outlet_Type"
+  ],
+  "app_input_columns": [
+    "Item_Weight",
+    "Item_Fat_Content",
+    "Item_Visibility",
+    "Item_Type",
+    "Item_MRP",
+    "Outlet_Establishment_Year",
+    "Outlet_Size",
+    "Outlet_Location_Type",
+    "Outlet_Type"
+  ],
+  "category_options": {
+    "Item_Fat_Content": [
+      "Low Fat",
+      "Non-Edible",
+      "Regular"
+    ],
+    "Item_Type": [
+      "Baking Goods",
+      "Breads",
+      "Breakfast",
+      "Canned",
+      "Dairy",
+      "Frozen Foods",
+      "Fruits and Vegetables",
+      "Hard Drinks",
+      "Health and Hygiene",
+      "Household",
+      "Meat",
+      "Others",
+      "Seafood",
+      "Snack Foods",
+      "Soft Drinks",
+      "Starchy Foods"
+    ],
+    "Outlet_Size": [
+      "High",
+      "Medium",
+      "Small",
+      "Unknown"
+    ],
+    "Outlet_Location_Type": [
+      "Tier 1",
+      "Tier 2",
+      "Tier 3"
+    ],
+    "Outlet_Type": [
+      "Grocery Store",
+      "Supermarket Type1",
+      "Supermarket Type2",
+      "Supermarket Type3"
+    ]
+  },
+  "establishment_years": [
+    1985,
+    1987,
+    1997,
+    1998,
+    1999,
+    2002,
+    2004,
+    2007,
+    2009
+  ],
+  "numeric_ranges": {
+    "Item_Weight": {
+      "min": 4.555,
+      "max": 21.35,
+      "median": 12.6
+    },
+    "Item_Visibility": {
+      "min": 0.003574698,
+      "max": 0.328390948,
+      "median": 0.058168807
+    },
+    "Item_MRP": {
+      "min": 31.29,
+      "max": 266.8884,
+      "median": 144.26280000000003
+    }
+  },
+  "metrics": {
+    "test_rmse": 1021.5948499863506,
+    "test_mae": 716.0882736811925,
+    "test_r2": 0.6160163607622959,
+    "cv_rmse": 1094.5490830666272,
+    "baseline_rmse": 1651.989750472933,
+    "baseline_mae": 1321.738728500184,
+    "interval_coverage": 0.797067448680352
+  }
+}
