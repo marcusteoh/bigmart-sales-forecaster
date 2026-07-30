@@ -244,8 +244,22 @@ def sgd(value: float) -> str:
 
 
 def money_both(value: float) -> str:
-    """NPR with the SGD equivalent in brackets - the standard display form here."""
+    """NPR with the SGD equivalent in brackets, the standard display form here."""
     return f"{money(value)} ({sgd(value)})"
+
+
+def chart_ink() -> str:
+    """Text colour for the chart that contrasts with whichever theme is active.
+
+    A fixed grey washes out against both light and dark backgrounds, so read the theme
+    and pick near-black or near-white. Falls back to the light default if the theme
+    cannot be read.
+    """
+    try:
+        base = st.context.theme.type
+    except Exception:
+        base = st.get_option("theme.base") or "light"
+    return "#FAFAFA" if base == "dark" else "#1A1A1A"
 
 
 # Input validation - warn rather than block, but say plainly what is unusual.
@@ -286,20 +300,12 @@ st.markdown(
 )
 
 head = st.columns(4)
-head[0].metric("Typical forecast error", money_both(METRICS["test_mae"]),
-               help="Mean absolute error on 1,705 held-out product-outlet pairs.")
-head[0].caption("per product-outlet decision")
+head[0].metric("Typical forecast error", money_both(METRICS["test_mae"]))
 head[1].metric("Improvement vs flat average",
-               f"{(1 - METRICS['test_mae'] / METRICS['baseline_mae']) * 100:.0f}%",
-               help="Against planning with a single chain-wide average.")
-head[1].caption(f"a flat average errs by {money_both(METRICS['baseline_mae'])}")
-head[2].metric("Variance explained (R²)", f"{METRICS['test_r2']:.3f}",
-               help="Share of sales variation the model accounts for.")
-head[2].caption("1.000 would be a perfect forecast")
+               f"{(1 - METRICS['test_mae'] / METRICS['baseline_mae']) * 100:.0f}%")
+head[2].metric("Variance explained (R²)", f"{METRICS['test_r2']:.3f}")
 head[3].metric("Planning range accuracy",
-               f"{METRICS['interval_coverage'] * 100:.0f}%",
-               help="How often actual sales fell inside the 80% range on held-out data.")
-head[3].caption("against an 80% target")
+               f"{METRICS['interval_coverage'] * 100:.0f}%")
 
 st.divider()
 
@@ -382,14 +388,22 @@ with tab_forecast:
         ax.set_xlabel(f"Retail price ({CURRENCY_SYMBOL})")
         ax.set_ylabel(f"Forecast revenue ({CURRENCY_SYMBOL})")
         ax.set_title("Price sensitivity", fontweight="bold")
-        ax.legend(frameon=False, fontsize=9)
+
+        # Every piece of chart text takes the theme-contrasting colour, and the grid
+        # sits at low opacity so it reads on a light or a dark background.
+        ink = chart_ink()
+        legend = ax.legend(frameon=False, fontsize=9)
+        for txt in legend.get_texts():
+            txt.set_color(ink)
         ax.spines[["top", "right"]].set_visible(False)
-        ax.tick_params(colors="grey")
+        ax.tick_params(colors=ink, labelsize=9)
         for spine in ax.spines.values():
-            spine.set_color("grey")
-        ax.xaxis.label.set_color("grey")
-        ax.yaxis.label.set_color("grey")
-        ax.title.set_color("grey")
+            spine.set_color(ink)
+        ax.xaxis.label.set_color(ink)
+        ax.yaxis.label.set_color(ink)
+        ax.title.set_color(ink)
+        ax.grid(True, alpha=0.15, color=ink)
+        ax.set_axisbelow(True)
         plt.tight_layout()
         st.pyplot(fig, width="stretch")
         plt.close(fig)
@@ -414,13 +428,13 @@ training.
 
 **Currency.** BigMart is a Nepalese retail chain, so all amounts are Nepalese rupees
 ({CURRENCY_SYMBOL}). The SGD figures in brackets are a display conversion at
-{CURRENCY_SYMBOL} {npr_per_sgd:,.2f} per SGD, set in the sidebar — they are for
+{CURRENCY_SYMBOL} {npr_per_sgd:,.2f} per SGD, set in the sidebar, they are for
 readability and play no part in the model. Changing the rate rescales every SGD figure
 identically and changes no conclusion.
 
 **What drives the forecast.** Only three of the nine inputs carry measurable signal.
 Permutation importance below is how much test RMSE worsens when that input is
-randomised — so a value near zero means the model is not using it.
+randomised, so a value near zero means the model is not using it.
 
 | Input | Variance explained (η²) | Permutation importance |
 |---|---|---|
@@ -443,12 +457,12 @@ feature sets were compared by cross-validation on the training data:
 | 6 features | 1,096.5 | ± 21.7 |
 | 3 features | 1,099.3 | ± 20.1 |
 
-The gap across all three is **3.90**, while the noise between folds is **20–23** — five
+The gap across all three is **3.90**, while the noise between folds is **20 to 23**, five
 times larger. Dropping the weak inputs is a change inside the noise, not an
 improvement. With no accuracy argument either way, they are kept so a category manager
 can still explore product-level options. The finding is the real result: this problem
-is limited by the data available — no footfall, promotions, competitor pricing or
-stock-on-hand — not by the model. At production scale the three-input version would be
+is limited by the data available, meaning no footfall, promotions, competitor pricing
+or stock-on-hand, not by the model. At production scale the three-input version would be
 the right choice, at no measurable cost in accuracy.
 
 *Figures from sections 2.3.2.1, 3.5 and 7.2 of the notebook.*
@@ -469,12 +483,3 @@ the right choice, at no measurable cost in accuracy.
         "Tuned hyperparameters: "
         + ", ".join(f"{k}={v}" for k, v in sorted(META["model_params"].items()))
     )
-
-st.divider()
-st.markdown(
-    '<p class="footnote">BigMart Sales Forecaster · Machine Learning for Developers '
-    "(CAI2C08) · Model trained on the BigMart Sales dataset (8,523 product-outlet "
-    "records). Amounts in Nepalese rupees (NPR); SGD shown in brackets for "
-    "reference only.</p>",
-    unsafe_allow_html=True,
-)

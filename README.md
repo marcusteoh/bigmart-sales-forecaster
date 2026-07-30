@@ -1,7 +1,7 @@
 # BigMart Sales Forecaster
 
-Predicting `Item_Outlet_Sales` — the revenue a single product generates at a single
-outlet — so a retail chain can plan inventory and outlet strategy before the selling
+Predicting `Item_Outlet_Sales`, the revenue a single product generates at a single
+outlet, so a retail chain can plan inventory and outlet strategy before the selling
 period rather than review it afterwards.
 
 **Machine Learning for Developers (CAI2C08)** · Diploma in Applied Artificial
@@ -11,14 +11,15 @@ Intelligence · Temasek Polytechnic
 
 ## Problem
 
-Regression. The target is a continuous dollar amount, and the unit of observation is one
-product at one store — which is exactly the unit of the inventory decision.
+Regression. The target is a continuous amount in Nepalese rupees, and the unit of
+observation is one product at one store, which is exactly the unit of the inventory
+decision.
 
 | | |
 |---|---|
 | Dataset | [BigMart Sales](https://www.kaggle.com/datasets/yasserh/bigmartsalesdataset) (Kaggle) |
 | Size | 8,523 rows × 12 columns (11 features + target) |
-| Target | `Item_Outlet_Sales` (continuous, right-skewed, mean $2,181) |
+| Target | `Item_Outlet_Sales` (continuous, right-skewed, mean NPR 2,181) |
 | Task | Regression |
 
 ## Results
@@ -28,23 +29,23 @@ test score was consulted.
 
 | Measure | Model | Naive baseline (flat average) | Improvement |
 |---|---|---|---|
-| MAE | **$716.09** | $1,321.74 | 45.8% |
-| RMSE | **$1,021.59** | $1,651.99 | 38.2% |
-| R² | **0.616** | −0.004 | — |
+| MAE | **NPR 716.09** | NPR 1,321.74 | 45.8% |
+| RMSE | **NPR 1,021.59** | NPR 1,651.99 | 38.2% |
+| R² | **0.616** | −0.004 | n/a |
 
 An 80% prediction interval accompanies every forecast, measured at 79.7% empirical
 coverage on held-out data.
 
 **Headline finding:** retail price and store format account for almost all predictive
-power. Two independent methods agree — a cross-validated feature-set comparison and
-permutation importance — that the remaining six features contribute nothing measurable.
+power. Two independent methods agree, a cross-validated feature-set comparison and
+permutation importance, that the remaining six features contribute nothing measurable.
 The problem is data-limited, not model-limited.
 
 ### Why nine features when three perform identically
 
 Only `Item_MRP` (η² 0.319), `Outlet_Type` (0.240) and `Outlet_Age` (0.087) carry real
 signal. The other six sit at or below η² 0.05, and permutation importance puts them
-within noise of zero — `Outlet_Location_Type` changes the forecast by **exactly 0.00**
+within noise of zero. `Outlet_Location_Type` changes the forecast by **exactly 0.00**
 across a 720-combination sweep, because city tier is confounded with store format
 across the ten outlets.
 
@@ -57,14 +58,14 @@ the training split:
 | Lean (6) | 1,096.5 | ± 21.7 |
 | Minimal (3) | 1,099.3 | ± 20.1 |
 
-The spread across all three is **3.90** against fold-to-fold noise of **20–23**, so
+The spread across all three is **3.90** against fold-to-fold noise of **20 to 23**, so
 removal is a change inside the noise rather than an improvement. With no measurable
 difference to decide it, the tie is broken on deployment grounds: the app is more useful
 with product-level controls, and nine features is what the approved proposal specified.
 At production scale the three-feature model would be the right choice.
 
-The reasoning is recorded at the point of definition — see the feature-list comment in
-[`bigmart_preprocessing.py`](bigmart_preprocessing.py) — and in notebook sections 3.5
+The reasoning is recorded at the point of definition. See the feature-list comment in
+[`bigmart_preprocessing.py`](bigmart_preprocessing.py), and notebook sections 3.5
 and 7.2.
 
 ## Repository layout
@@ -93,27 +94,27 @@ The app expects `models/best_pipeline.joblib` and its two quantile companions. I
 are absent, run section 7.8 of the notebook to regenerate them.
 
 > **Version note:** `scikit-learn` is pinned to 1.8.0. Pickled pipelines are sensitive to
-> the version that created them — loading these files under a different release may warn
+> the version that created them. Loading these files under a different release may warn
 > or fail.
 
 ## Method summary
 
-1. **Data quality** — five spellings of `Item_Fat_Content` collapsed to two categories;
+1. **Data quality.** Five spellings of `Item_Fat_Content` collapsed to two categories;
    526 impossible `Item_Visibility == 0` values treated as missing; 1,599 non-consumable
    rows relabelled `Non-Edible` rather than masquerading as low-fat food.
-2. **Missingness** — `Outlet_Size` is missing for three *entire* outlets, so it is
+2. **Missingness.** `Outlet_Size` is missing for three *entire* outlets, so it is
    modelled as an explicit `Unknown` level instead of imputing a size nobody measured.
    `Item_Weight` is recovered per-product (1,138 of 1,142 affected products have the
    weight recorded on another row).
-3. **Feature engineering** — `Outlet_Age` replaces the raw establishment year.
-4. **Feature selection** — three candidate feature sets compared by cross-validated
+3. **Feature engineering.** `Outlet_Age` replaces the raw establishment year.
+4. **Feature selection.** Three candidate feature sets compared by cross-validated
    RMSE; the differences fell inside the fold-to-fold noise, and the decision is
    documented on that evidence.
-5. **Models** — naive mean baseline, Linear Regression (raw and log target), Decision
+5. **Models.** Naive mean baseline, Linear Regression (raw and log target), Decision
    Tree, Random Forest, Gradient Boosting.
-6. **Tuning** — `RandomizedSearchCV`, at most 3 values per hyperparameter, applied to
+6. **Tuning.** `RandomizedSearchCV`, at most 3 values per hyperparameter, applied to
    both Gradient Boosting and Random Forest so the comparison stays fair.
-7. **Evaluation** — RMSE, MAE and R² on a held-out test set, plus repeated
+7. **Evaluation.** RMSE, MAE and R² on a held-out test set, plus repeated
    cross-validation with confidence intervals, an overfitting-gap analysis and
    segment-level error breakdown.
 
