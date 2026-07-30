@@ -9,10 +9,10 @@ retail planner:
 The pipeline carries its own cleaning, imputation and encoding, so this file never
 re-implements preprocessing - it only collects raw inputs and calls .predict().
 
-Currency: the source dataset does not state its units, so amounts are labelled as
-rupees and the SGD figures are a display-only conversion at a rate the user sets in
-the sidebar. Nothing in the model depends on the currency - a monotonic change of
-units leaves every metric and every comparison identical.
+Currency: BigMart is a Nepalese retail chain, so all amounts are Nepalese rupees (NPR).
+An SGD equivalent is shown in brackets for a Singaporean audience, converted at a rate
+the user sets in the sidebar. The conversion is display-only - nothing in the model
+depends on the currency, since a change of units rescales every figure identically.
 
 Run locally:  streamlit run streamlit_app.py
 """
@@ -32,10 +32,10 @@ import joblib
 APP_DIR = Path(__file__).parent
 MODELS_DIR = APP_DIR / "models"
 
-# Display units. The dataset's own figures are treated as rupees; SGD is derived for
-# readability only, never fed back into the model.
-CURRENCY_SYMBOL = "Rs"
-DEFAULT_RUPEES_PER_SGD = 105.0
+# Display units. The data is Nepalese rupees; SGD is derived for readability only and
+# is never fed back into the model.
+CURRENCY_SYMBOL = "NPR"
+DEFAULT_NPR_PER_SGD = 105.0
 
 st.set_page_config(
     page_title="BigMart Sales Forecaster",
@@ -50,7 +50,8 @@ st.markdown(
     """
     <style>
       .main .block-container { padding-top: 2rem; max-width: 1200px; }
-      div[data-testid="stMetricValue"] { font-size: 2.1rem; }
+      /* Sized so "NPR 2,461.92 (S$23.45)" fits on one line in a column. */
+      div[data-testid="stMetricValue"] { font-size: 1.55rem; }
       .forecast-range {
           border-left: 4px solid #4C72B0;
           padding: 0.6rem 1rem;
@@ -212,26 +213,32 @@ with st.sidebar:
     st.subheader("Display currency")
     # Exposed as an input rather than hard-coded: an embedded rate silently goes stale,
     # and the assumption belongs to whoever is reading the forecast.
-    rupees_per_sgd = st.number_input(
+    npr_per_sgd = st.number_input(
         f"{CURRENCY_SYMBOL} per 1 SGD",
         min_value=1.0, max_value=1000.0,
-        value=DEFAULT_RUPEES_PER_SGD, step=0.5,
-        help="Used only to display an SGD equivalent. It does not affect the model.",
+        value=DEFAULT_NPR_PER_SGD, step=0.5,
+        help="Used only to convert the SGD figure shown in brackets. It does not "
+             "affect the forecast.",
     )
     st.caption(
-        f"Forecasts are produced in the dataset's own units, shown as "
-        f"{CURRENCY_SYMBOL}. Set the rate to today's value before quoting SGD figures."
+        "Forecasts are in Nepalese rupees. Set this to today's rate before quoting "
+        "the SGD figures."
     )
 
 
 def money(value: float) -> str:
-    """Format an amount in the dataset's own currency."""
+    """Format an amount in NPR, the currency of the source data."""
     return f"{CURRENCY_SYMBOL} {value:,.2f}"
 
 
 def sgd(value: float) -> str:
     """Convert to SGD for display only, at the user-set rate."""
-    return f"S${value / rupees_per_sgd:,.2f}"
+    return f"S${value / npr_per_sgd:,.2f}"
+
+
+def money_both(value: float) -> str:
+    """NPR with the SGD equivalent in brackets - the standard display form here."""
+    return f"{money(value)} ({sgd(value)})"
 
 
 # Input validation - warn rather than block, but say plainly what is unusual.
@@ -272,13 +279,13 @@ st.markdown(
 )
 
 head = st.columns(4)
-head[0].metric("Typical forecast error", money(METRICS["test_mae"]),
+head[0].metric("Typical forecast error", money_both(METRICS["test_mae"]),
                help="Mean absolute error on 1,705 held-out product-outlet pairs.")
-head[0].caption(f"≈ {sgd(METRICS['test_mae'])} per decision")
+head[0].caption("per product-outlet decision")
 head[1].metric("Improvement vs flat average",
                f"{(1 - METRICS['test_mae'] / METRICS['baseline_mae']) * 100:.0f}%",
                help="Against planning with a single chain-wide average.")
-head[1].caption(f"flat average errs by {money(METRICS['baseline_mae'])}")
+head[1].caption(f"a flat average errs by {money_both(METRICS['baseline_mae'])}")
 head[2].metric("Variance explained (R²)", f"{METRICS['test_r2']:.3f}",
                help="Share of sales variation the model accounts for.")
 head[2].caption("1.000 would be a perfect forecast")
@@ -312,20 +319,15 @@ with tab_forecast:
         st.subheader("Forecast")
         st.metric(
             label=f"{item_type} at a {outlet_type}",
-            value=money(result["forecast"]),
+            value=money_both(result["forecast"]),
             help="Expected revenue for this product at this outlet over the period.",
         )
-        st.markdown(
-            f'<p class="sgd">≈ <strong>{sgd(result["forecast"])}</strong> '
-            f'at {CURRENCY_SYMBOL} {rupees_per_sgd:,.2f} per SGD</p>',
-            unsafe_allow_html=True,
-        )
+        st.caption(f"converted at {CURRENCY_SYMBOL} {npr_per_sgd:,.2f} per SGD")
         st.markdown(
             f"""<div class="forecast-range">
                 <strong>Planning range (80% confidence)</strong><br/>
-                {money(result['lower_bound'])} &nbsp;–&nbsp; {money(result['upper_bound'])}
-                <br/><span class="sgd">{sgd(result['lower_bound'])} &nbsp;–&nbsp;
-                {sgd(result['upper_bound'])}</span>
+                {money_both(result['lower_bound'])}<br/>
+                &nbsp;&nbsp;to&nbsp; {money_both(result['upper_bound'])}
                 </div>""",
             unsafe_allow_html=True,
         )
@@ -399,18 +401,15 @@ training.
 
 | Measure | Model | Planning on a flat average |
 |---|---|---|
-| Typical error (MAE) | {money(METRICS['test_mae'])} | {money(METRICS['baseline_mae'])} |
-| RMSE | {money(METRICS['test_rmse'])} | {money(METRICS['baseline_rmse'])} |
+| Typical error (MAE) | {money_both(METRICS['test_mae'])} | {money_both(METRICS['baseline_mae'])} |
+| RMSE | {money_both(METRICS['test_rmse'])} | {money_both(METRICS['baseline_rmse'])} |
 | R² | {METRICS['test_r2']:.3f} | ~0.00 |
 
-At {CURRENCY_SYMBOL} {rupees_per_sgd:,.2f} per SGD, the typical error is about
-**{sgd(METRICS['test_mae'])}** per product-outlet decision, against
-{sgd(METRICS['baseline_mae'])} for a flat average.
-
-**Currency.** The source dataset does not state its currency. Amounts are shown in the
-dataset's own units, labelled {CURRENCY_SYMBOL}, and the SGD figures are a display
-conversion at the rate set in the sidebar. The model is unit-agnostic: changing
-currency rescales every figure identically and changes no conclusion.
+**Currency.** BigMart is a Nepalese retail chain, so all amounts are Nepalese rupees
+({CURRENCY_SYMBOL}). The SGD figures in brackets are a display conversion at
+{CURRENCY_SYMBOL} {npr_per_sgd:,.2f} per SGD, set in the sidebar — they are for
+readability and play no part in the model. Changing the rate rescales every SGD figure
+identically and changes no conclusion.
 
 **What drives the forecast.** Retail price and store format account for almost all of
 the model's predictive power. Product attributes such as weight, fat content and
@@ -438,7 +437,7 @@ st.divider()
 st.markdown(
     '<p class="footnote">BigMart Sales Forecaster · Machine Learning for Developers '
     "(CAI2C08) · Model trained on the BigMart Sales dataset (8,523 product-outlet "
-    "records). Amounts in the dataset's own currency units; SGD shown for reference "
-    "only.</p>",
+    "records). Amounts in Nepalese rupees (NPR); SGD shown in brackets for "
+    "reference only.</p>",
     unsafe_allow_html=True,
 )
