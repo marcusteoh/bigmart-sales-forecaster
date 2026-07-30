@@ -40,6 +40,33 @@ power. Two independent methods agree — a cross-validated feature-set compariso
 permutation importance — that the remaining six features contribute nothing measurable.
 The problem is data-limited, not model-limited.
 
+### Why nine features when three perform identically
+
+Only `Item_MRP` (η² 0.319), `Outlet_Type` (0.240) and `Outlet_Age` (0.087) carry real
+signal. The other six sit at or below η² 0.05, and permutation importance puts them
+within noise of zero — `Outlet_Location_Type` changes the forecast by **exactly 0.00**
+across a 720-combination sweep, because city tier is confounded with store format
+across the ten outlets.
+
+They are kept on evidence, not habit. Three feature sets were compared by 5-fold CV on
+the training split:
+
+| Feature set | CV RMSE | Fold spread |
+|---|---|---|
+| Full (9) | 1,100.4 | ± 23.1 |
+| Lean (6) | 1,096.5 | ± 21.7 |
+| Minimal (3) | 1,099.3 | ± 20.1 |
+
+The spread across all three is **3.90** against fold-to-fold noise of **20–23**, so
+removal is a change inside the noise rather than an improvement. With no measurable
+difference to decide it, the tie is broken on deployment grounds: the app is more useful
+with product-level controls, and nine features is what the approved proposal specified.
+At production scale the three-feature model would be the right choice.
+
+The reasoning is recorded at the point of definition — see the feature-list comment in
+[`bigmart_preprocessing.py`](bigmart_preprocessing.py) — and in notebook sections 3.5
+and 7.2.
+
 ## Repository layout
 
 ```

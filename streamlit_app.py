@@ -136,6 +136,13 @@ def predict_frame(frame: pd.DataFrame) -> pd.DataFrame:
 # --------------------------------------------------------------------------------
 # Sidebar - product and outlet inputs, then the display-currency control
 # --------------------------------------------------------------------------------
+# All nine model features are exposed as inputs, including the six that barely move
+# the prediction (Item_Type, Item_Weight, Item_Fat_Content, Item_Visibility,
+# Outlet_Size, Outlet_Location_Type). That is a deliberate choice, not an oversight:
+# notebook 3.5 compared the full nine-feature set against 6- and 3-feature versions
+# and the CV RMSE difference was 3.90 against fold noise of 20-23, i.e. inside the
+# noise. With no measurable accuracy argument either way, the tie went to the richer
+# interface. See the feature-list comment in bigmart_preprocessing.py for the figures.
 with st.sidebar:
     st.header("Forecast inputs")
     st.caption("The forecast updates as you change any value.")
@@ -411,10 +418,40 @@ training.
 readability and play no part in the model. Changing the rate rescales every SGD figure
 identically and changes no conclusion.
 
-**What drives the forecast.** Retail price and store format account for almost all of
-the model's predictive power. Product attributes such as weight, fat content and
-category contribute very little once price and format are known — a finding confirmed
-by two independent methods in the notebook.
+**What drives the forecast.** Only three of the nine inputs carry measurable signal.
+Permutation importance below is how much test RMSE worsens when that input is
+randomised — so a value near zero means the model is not using it.
+
+| Input | Variance explained (η²) | Permutation importance |
+|---|---|---|
+| Retail price | 0.319 | **707.15** |
+| Store format | 0.240 | **545.75** |
+| Year opened (outlet age) | 0.087 | **28.61** |
+| Store size | 0.048 | 0.13 |
+| Shelf visibility | 0.017 | −0.19 |
+| City tier | 0.013 | 0.01 |
+| Product category | 0.005 | 0.17 |
+| Unit weight | 0.002 | −0.04 |
+| Fat content | 0.0004 | −0.28 |
+
+**So why keep the other six?** Because removing them was tested, not assumed. Three
+feature sets were compared by cross-validation on the training data:
+
+| Feature set | CV RMSE | Fold-to-fold spread |
+|---|---|---|
+| All 9 | 1,100.4 | ± 23.1 |
+| 6 features | 1,096.5 | ± 21.7 |
+| 3 features | 1,099.3 | ± 20.1 |
+
+The gap across all three is **3.90**, while the noise between folds is **20–23** — five
+times larger. Dropping the weak inputs is a change inside the noise, not an
+improvement. With no accuracy argument either way, they are kept so a category manager
+can still explore product-level options. The finding is the real result: this problem
+is limited by the data available — no footfall, promotions, competitor pricing or
+stock-on-hand — not by the model. At production scale the three-input version would be
+the right choice, at no measurable cost in accuracy.
+
+*Figures from sections 2.3.2.1, 3.5 and 7.2 of the notebook.*
 
 **Limits you should know about.**
 - Outlet age is measured against **{META['data_year']}**, the year the data was

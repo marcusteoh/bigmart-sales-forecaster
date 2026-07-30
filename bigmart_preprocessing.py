@@ -29,6 +29,46 @@ NON_EDIBLE_LABEL = 'Non-Edible'
 
 # The full candidate feature set. Outlet_Age replaces the raw establishment year;
 # the identifier columns are deliberately absent (see notebook 2.2.6).
+#
+# WHY ALL NINE ARE KEPT, INCLUDING THE ONES THAT BARELY MOVE THE PREDICTION
+# ------------------------------------------------------------------------
+# Two independent measurements agree that only three features carry real signal:
+#
+#   feature                     eta-squared   permutation importance
+#   Item_MRP                        0.319       707.15  (+/- 34.55)
+#   Outlet_Type                     0.240       545.75  (+/- 23.85)
+#   Outlet_Establishment_Year       0.087        28.61  (+/-  6.83)
+#   Outlet_Size                     0.048         0.13  (+/-  0.43)
+#   Item_Visibility                 0.017        -0.19  (+/-  0.68)
+#   Outlet_Location_Type            0.013         0.01  (+/-  0.09)
+#   Item_Type                       0.005         0.17  (+/-  0.65)
+#   Item_Weight                     0.002        -0.04  (+/-  0.86)
+#   Item_Fat_Content               0.0004        -0.28  (+/-  0.19)
+#
+# The bottom six are indistinguishable from zero. Outlet_Location_Type is the most
+# extreme: sweeping 720 input combinations changes the forecast by exactly 0.00,
+# because city tier is confounded with store format across the ten outlets (Tier 2
+# contains only Supermarket Type1 stores; Types 2 and 3 exist only in Tier 3).
+#
+# They are kept anyway, on evidence rather than habit. Notebook 3.5 compared three
+# feature sets by 5-fold CV on the training split:
+#
+#   Full    (9 features)   CV RMSE 1,100.4  +/- 23.1
+#   Lean    (6 features)   CV RMSE 1,096.5  +/- 21.7
+#   Minimal (3 features)   CV RMSE 1,099.3  +/- 20.1
+#
+# The spread across all three is 3.90, while the fold-to-fold standard deviation is
+# 20-23 - five times larger. Removing the weak features is therefore not an
+# improvement, it is a change inside the noise. With no measurable difference to
+# decide it, the tie is broken on deployment grounds: the Streamlit app is more
+# useful to a category manager who can vary product type, weight and fat content,
+# and the nine features are the set the approved project proposal specified.
+#
+# The finding itself is the real result: this problem is limited by the information
+# in the dataset (no footfall, promotions, competitor pricing or stock-on-hand),
+# not by the model or the feature list. If this went to production at scale, the
+# Minimal set would be the right choice - three inputs instead of nine, at no
+# measurable cost in accuracy.
 NUMERIC_FEATURES = ['Item_Weight', 'Item_Visibility', 'Item_MRP', 'Outlet_Age']
 CATEGORICAL_FEATURES = ['Item_Fat_Content', 'Item_Type', 'Outlet_Size',
                         'Outlet_Location_Type', 'Outlet_Type']
