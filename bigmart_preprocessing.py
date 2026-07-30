@@ -12,27 +12,30 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, StandardScaler
 
-# The BigMart data was collected in 2013. Outlet age is measured against that year so
+# the BigMart data was collected in 2013. outlet age is measured against that year so
 # the feature keeps the same meaning when the app runs in a later calendar year - if
 # the app used the real current year, every outlet would look older than anything the
 # model was trained on, and the model would be extrapolating.
 DATA_YEAR = 2013
 
-# Five spellings, two real categories (notebook 2.2.4).
+# the raw column holds five spellings for what are only two real categories (notebook
+# 2.2.4). left as they are, the encoder would produce five columns and split one signal
+# across duplicates that the model has no way of knowing are the same thing.
 FAT_CONTENT_MAP = {'LF': 'Low Fat', 'low fat': 'Low Fat', 'reg': 'Regular'}
 
-# Verified in notebook 3.1.1: these three Item_Types are exactly the 'NC' (non-consumable)
-# identifier prefix, and nothing else. Keying off Item_Type instead of Item_Identifier
-# lets the Streamlit app apply the identical rule without asking for a product code.
+# notebook 3.1.1 verified that these three Item_Types are exactly the products carrying
+# the 'NC' (non-consumable) identifier prefix, and nothing else. the rule keys off
+# Item_Type rather than Item_Identifier so the Streamlit app can apply the identical
+# rule without asking a user for a product code they have no reason to know.
 NON_EDIBLE_ITEM_TYPES = ('Health and Hygiene', 'Household', 'Others')
 NON_EDIBLE_LABEL = 'Non-Edible'
 
-# The full candidate feature set. Outlet_Age replaces the raw establishment year;
+# the full candidate feature set. Outlet_Age replaces the raw establishment year, and
 # the identifier columns are deliberately absent (see notebook 2.2.6).
 #
 # WHY ALL NINE ARE KEPT, INCLUDING THE ONES THAT BARELY MOVE THE PREDICTION
 # ------------------------------------------------------------------------
-# Two independent measurements agree that only three features carry real signal:
+# two independent measurements agree that only three features carry real signal:
 #
 #   feature                     eta-squared   permutation importance
 #   Item_MRP                        0.319       707.15  (+/- 34.55)
@@ -45,30 +48,31 @@ NON_EDIBLE_LABEL = 'Non-Edible'
 #   Item_Weight                     0.002        -0.04  (+/-  0.86)
 #   Item_Fat_Content               0.0004        -0.28  (+/-  0.19)
 #
-# The bottom six are indistinguishable from zero. Outlet_Location_Type is the most
-# extreme: sweeping 720 input combinations changes the forecast by exactly 0.00,
-# because city tier is confounded with store format across the ten outlets (Tier 2
-# contains only Supermarket Type1 stores; Types 2 and 3 exist only in Tier 3).
+# the bottom six are indistinguishable from zero. Outlet_Location_Type is the most
+# extreme: sweeping 720 input combinations moves the forecast by exactly 0.00, because
+# city tier is confounded with store format across the ten outlets - Tier 2 contains
+# only Supermarket Type1 stores, and Types 2 and 3 exist only in Tier 3, so once the
+# format is known the tier carries no information the model does not already have.
 #
-# They are kept anyway, on evidence rather than habit. Notebook 3.5 compared three
+# they are kept anyway, on evidence rather than habit. notebook 3.5 compared three
 # feature sets by 5-fold CV on the training split:
 #
 #   Full    (9 features)   CV RMSE 1,100.4  +/- 23.1
 #   Lean    (6 features)   CV RMSE 1,096.5  +/- 21.7
 #   Minimal (3 features)   CV RMSE 1,099.3  +/- 20.1
 #
-# The spread across all three is 3.90, while the fold-to-fold standard deviation is
-# 20-23 - five times larger. Removing the weak features is therefore not an
-# improvement, it is a change inside the noise. With no measurable difference to
-# decide it, the tie is broken on deployment grounds: the Streamlit app is more
-# useful to a category manager who can vary product type, weight and fat content,
-# and the nine features are the set the approved project proposal specified.
+# the spread across all three is 3.90 while the fold-to-fold standard deviation is
+# 20-23, five times larger. removing the weak features is therefore not an improvement,
+# it is a change inside the noise. with no measurable difference to decide it, the tie
+# is broken on deployment grounds - the Streamlit app is more useful to a category
+# manager who can vary product type, weight and fat content, and the nine features are
+# the set the approved project proposal specified.
 #
-# The finding itself is the real result: this problem is limited by the information
-# in the dataset (no footfall, promotions, competitor pricing or stock-on-hand),
-# not by the model or the feature list. If this went to production at scale, the
-# Minimal set would be the right choice - three inputs instead of nine, at no
-# measurable cost in accuracy.
+# the finding itself is the real result. this problem is limited by the information in
+# the dataset - no footfall, promotions, competitor pricing or stock-on-hand - not by
+# the model or the feature list. if this went to production at scale the Minimal set
+# would be the right choice, three inputs instead of nine at no measurable cost in
+# accuracy.
 NUMERIC_FEATURES = ['Item_Weight', 'Item_Visibility', 'Item_MRP', 'Outlet_Age']
 CATEGORICAL_FEATURES = ['Item_Fat_Content', 'Item_Type', 'Outlet_Size',
                         'Outlet_Location_Type', 'Outlet_Type']
@@ -82,24 +86,30 @@ def clean_deterministic(X):
     """
     X = X.copy()
 
-    # 1. Collapse the five fat-content spellings into the two real categories.
+    # collapse the five fat-content spellings into the two categories they actually
+    # represent, so the encoder sees one column per category rather than five.
     X['Item_Fat_Content'] = X['Item_Fat_Content'].replace(FAT_CONTENT_MAP)
 
-    # 2. Fat content is meaningless for cleaning products and toiletries. Give them
-    #    their own label instead of letting 1,599 rows masquerade as 'Low Fat' food.
+    # fat content is meaningless for cleaning products and toiletries. giving them their
+    # own label keeps 1,599 rows from masquerading as 'Low Fat' food, which would water
+    # down whatever that category means for the products where it does mean something.
     is_non_edible = X['Item_Type'].isin(NON_EDIBLE_ITEM_TYPES)
     X.loc[is_non_edible, 'Item_Fat_Content'] = NON_EDIBLE_LABEL
 
-    # 3. A stocked item that recorded sales cannot occupy 0%% of the shelf. Convert the
-    #    disguised missing value into a real NaN so the fitted imputer handles it.
+    # a stocked item that recorded sales cannot occupy 0% of the shelf, so the zero is a
+    # missing value in disguise. turning it into a real NaN hands it to the fitted
+    # imputer - left as 0.0 the model would read it as a genuine measurement of the
+    # least visible product in the chain.
     X['Item_Visibility'] = X['Item_Visibility'].replace(0.0, np.nan)
 
-    # 4. Three outlets have no size on record at all (notebook 2.2.7). Saying so is
-    #    honest; imputing the mode would invent a measurement for 28%% of rows.
+    # three outlets have no size on record at all (notebook 2.2.7). 'Unknown' says that
+    # plainly, where imputing the mode would invent a measurement for 28% of rows and
+    # hide a real fact about those stores from the model and from anyone reading it.
     X['Outlet_Size'] = X['Outlet_Size'].fillna('Unknown')
 
-    # 5. Feature engineering: years trading is the business quantity a planner reasons
-    #    about, and it is monotonic, unlike a raw calendar year.
+    # years trading is the quantity a planner actually reasons about, and unlike a raw
+    # calendar year it is monotonic - a larger value always means an older outlet, so
+    # the model can use it as a magnitude instead of an arbitrary label.
     X['Outlet_Age'] = DATA_YEAR - X['Outlet_Establishment_Year']
 
     return X
@@ -151,8 +161,9 @@ def build_preprocessor(numeric_features, categorical_features):
     ])
     categorical_pipe = Pipeline([
         ('impute', SimpleImputer(strategy='most_frequent')),
-        # handle_unknown='ignore' stops the app crashing if it is ever sent a category
-        # the training split never contained.
+        # handle_unknown='ignore' encodes an unseen category as all zeros instead of
+        # raising. the app takes free-form input from a user, so without this a single
+        # category the training split never contained would take the whole page down.
         ('encode', OneHotEncoder(handle_unknown='ignore', sparse_output=False)),
     ])
     return ColumnTransformer(
